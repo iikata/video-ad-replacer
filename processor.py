@@ -1,12 +1,19 @@
+import sys
 import subprocess
 import tempfile
 from pathlib import Path
 
 
+def _bin(name: str) -> str:
+    if getattr(sys, "frozen", False):
+        return str(Path(sys._MEIPASS) / name)
+    return name
+
+
 def check_ffmpeg() -> bool:
     try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-        subprocess.run(["ffprobe", "-version"], capture_output=True, check=True)
+        subprocess.run([_bin("ffmpeg"), "-version"], capture_output=True, check=True)
+        subprocess.run([_bin("ffprobe"), "-version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -15,7 +22,7 @@ def check_ffmpeg() -> bool:
 def get_video_info(path: str) -> dict:
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error",
+            _bin("ffprobe"), "-v", "error",
             "-show_entries", "format=duration",
             "-of", "csv=p=0",
             path,
@@ -31,7 +38,7 @@ def get_video_info(path: str) -> dict:
 def trim_video(input_path: str, output_path: str, keep_duration: float) -> None:
     subprocess.run(
         [
-            "ffmpeg", "-y",
+            _bin("ffmpeg"), "-y",
             "-i", input_path,
             "-t", str(keep_duration),
             "-c:v", "libx264", "-preset", "ultrafast",
@@ -46,7 +53,7 @@ def trim_video(input_path: str, output_path: str, keep_duration: float) -> None:
 def concat_videos(video1_path: str, video2_path: str, output_path: str) -> None:
     subprocess.run(
         [
-            "ffmpeg", "-y",
+            _bin("ffmpeg"), "-y",
             "-i", video1_path,
             "-i", video2_path,
             "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]",
