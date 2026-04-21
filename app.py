@@ -39,11 +39,11 @@ class App(tk.Tk):
         # --- フレーム数入力 ---
         frame_f = tk.Frame(self)
         frame_f.pack(fill="x", **pad)
-        tk.Label(frame_f, text="カットフレーム数", anchor="w").pack(side="left")
-        self._cut_frames_var = tk.StringVar(value="")
-        tk.Entry(frame_f, textvariable=self._cut_frames_var, width=8).pack(side="left", padx=8)
-        self._frames_hint = tk.Label(frame_f, text="← 前の広告MP4を選択すると自動入力", fg="gray")
-        self._frames_hint.pack(side="left")
+        tk.Label(frame_f, text="カットする秒数", anchor="w").pack(side="left")
+        self._cut_seconds_var = tk.StringVar(value="")
+        tk.Entry(frame_f, textvariable=self._cut_seconds_var, width=8).pack(side="left", padx=8)
+        self._seconds_hint = tk.Label(frame_f, text="← 前の広告MP4を選択すると自動入力", fg="gray")
+        self._seconds_hint.pack(side="left")
 
         # --- 実行ボタン ---
         self._run_btn = tk.Button(self, text="実行", width=20, command=self._run)
@@ -73,10 +73,11 @@ class App(tk.Tk):
     def _load_old_ad_frames(self, path: str):
         try:
             info = get_video_info(path)
-            self._cut_frames_var.set(str(info["frame_count"]))
-            self._frames_hint.config(text=f"← {info['frame_count']}フレーム ({info['fps']:.2f}fps)", fg="green")
+            seconds = round(info["duration"], 2)
+            self._cut_seconds_var.set(str(seconds))
+            self._seconds_hint.config(text=f"← {seconds}秒", fg="green")
         except Exception as e:
-            self._frames_hint.config(text=f"← 読み取りエラー: {e}", fg="red")
+            self._seconds_hint.config(text=f"← 読み取りエラー: {e}", fg="red")
 
     def _log_write(self, message: str, tag: str = ""):
         self._log.config(state="normal")
@@ -97,7 +98,7 @@ class App(tk.Tk):
         old_ad = self._vars["old_ad_file"].get()
         ad = self._vars["ad_file"].get()
         output = self._vars["output_dir"].get()
-        cut = self._cut_frames_var.get()
+        cut = self._cut_seconds_var.get()
 
         if not target or not Path(target).is_dir():
             return False, "Targetフォルダを選択してください"
@@ -107,8 +108,11 @@ class App(tk.Tk):
             return False, "新規広告MP4を選択してください"
         if not output or not Path(output).is_dir():
             return False, "出力先フォルダを選択してください"
-        if not cut.isdigit() or int(cut) <= 0:
-            return False, "フレーム数は正の整数を入力してください"
+        try:
+            if float(cut) <= 0:
+                raise ValueError
+        except ValueError:
+            return False, "秒数は正の数値を入力してください"
         return True, ""
 
     def _run(self):
@@ -120,7 +124,7 @@ class App(tk.Tk):
         target_dir = self._vars["target_dir"].get()
         ad_file = self._vars["ad_file"].get()
         output_dir = self._vars["output_dir"].get()
-        cut_frames = int(self._cut_frames_var.get())
+        cut_seconds = float(self._cut_seconds_var.get())
 
         mp4_files = sorted(Path(target_dir).glob("*.mp4"))
         if not mp4_files:
@@ -135,7 +139,7 @@ class App(tk.Tk):
                 self._log_write(f"[{i}/{len(mp4_files)}] 処理中: {mp4.name} ...")
                 try:
                     out = process_single_video(
-                        str(mp4), ad_file, output_dir, cut_frames
+                        str(mp4), ad_file, output_dir, cut_seconds
                     )
                     self._log_write(f"  ✓ → {Path(out).name}", "success")
                 except Exception as e:

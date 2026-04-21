@@ -17,9 +17,7 @@ def get_video_info(path: str) -> dict:
     result = subprocess.run(
         [
             "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-count_packets",
-            "-show_entries", "stream=avg_frame_rate,nb_read_packets",
+            "-show_entries", "format=duration",
             "-of", "csv=p=0",
             path,
         ],
@@ -27,20 +25,16 @@ def get_video_info(path: str) -> dict:
         text=True,
         check=True,
     )
-    parts = result.stdout.strip().split(",")
-    fps_num, fps_den = parts[0].split("/")
-    fps = float(fps_num) / float(fps_den)
-    frame_count = int(parts[1])
-    return {"frame_count": frame_count, "fps": fps}
+    duration = float(result.stdout.strip())
+    return {"duration": duration}
 
 
-def trim_video(input_path: str, output_path: str, keep_frames: int, fps: float) -> None:
-    duration = keep_frames / fps
+def trim_video(input_path: str, output_path: str, keep_duration: float) -> None:
     subprocess.run(
         [
             "ffmpeg", "-y",
             "-i", input_path,
-            "-t", str(duration),
+            "-t", str(keep_duration),
             "-c", "copy",
             output_path,
         ],
@@ -75,7 +69,7 @@ def process_single_video(
     target_path: str,
     ad_path: str,
     output_dir: str,
-    cut_frames: int,
+    cut_seconds: float,
     progress_callback=None,
 ) -> str:
     target = Path(target_path)
@@ -83,16 +77,16 @@ def process_single_video(
     output_path = str(Path(output_dir) / output_filename)
 
     info = get_video_info(target_path)
-    keep_frames = info["frame_count"] - cut_frames
+    keep_duration = info["duration"] - cut_seconds
 
-    if keep_frames <= 0:
+    if keep_duration <= 0:
         raise ValueError(
-            f"カットフレーム数({cut_frames})が総フレーム数({info['frame_count']})以上です"
+            f"カット秒数({cut_seconds}秒)が動画の長さ({info['duration']:.1f}秒)以上です"
         )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         trimmed_path = str(Path(tmpdir) / "trimmed.mp4")
-        trim_video(target_path, trimmed_path, keep_frames, info["fps"])
+        trim_video(target_path, trimmed_path, keep_duration)
         concat_videos(trimmed_path, ad_path, output_path)
 
     if progress_callback:
