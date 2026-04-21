@@ -31,3 +31,27 @@ def test_get_video_info_raises_on_ffprobe_error():
         mock_run.side_effect = Exception("ffprobe failed")
         with pytest.raises(Exception):
             get_video_info("test.mp4")
+
+
+from processor import trim_video, concat_videos
+
+
+def test_trim_video_calls_ffmpeg_with_correct_duration():
+    with patch("processor.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        trim_video("input.mp4", "out.mp4", keep_frames=870, fps=29.97)
+        args = mock_run.call_args[0][0]
+        assert args[0] == "ffmpeg"
+        assert "-t" in args
+        duration_index = args.index("-t") + 1
+        assert abs(float(args[duration_index]) - 29.03) < 0.1
+
+
+def test_concat_videos_creates_list_file_and_calls_ffmpeg():
+    with patch("processor.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        concat_videos("trimmed.mp4", "ad.mp4", "output.mp4")
+        args = mock_run.call_args[0][0]
+        assert args[0] == "ffmpeg"
+        assert "-f" in args
+        assert "concat" in args
