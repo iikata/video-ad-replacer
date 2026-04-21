@@ -1,6 +1,5 @@
 import subprocess
 import tempfile
-import os
 from pathlib import Path
 
 
@@ -44,25 +43,21 @@ def trim_video(input_path: str, output_path: str, keep_duration: float) -> None:
 
 
 def concat_videos(video1_path: str, video2_path: str, output_path: str) -> None:
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(f"file '{video1_path}'\n")
-        f.write(f"file '{video2_path}'\n")
-        list_path = f.name
-    try:
-        subprocess.run(
-            [
-                "ffmpeg", "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", list_path,
-                "-c", "copy",
-                output_path,
-            ],
-            capture_output=True,
-            check=True,
-        )
-    finally:
-        os.unlink(list_path)
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", video1_path,
+            "-i", video2_path,
+            "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]",
+            "-map", "[v]",
+            "-map", "[a]",
+            "-c:v", "libx264", "-preset", "ultrafast",
+            "-c:a", "aac",
+            output_path,
+        ],
+        capture_output=True,
+        check=True,
+    )
 
 
 def process_single_video(

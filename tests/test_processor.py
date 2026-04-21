@@ -40,14 +40,14 @@ def test_trim_video_calls_ffmpeg_with_correct_duration():
         assert abs(float(args[duration_index]) - 30.5) < 0.001
 
 
-def test_concat_videos_creates_list_file_and_calls_ffmpeg():
+def test_concat_videos_uses_filter_complex():
     with patch("processor.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         concat_videos("trimmed.mp4", "ad.mp4", "output.mp4")
         args = mock_run.call_args[0][0]
         assert args[0] == "ffmpeg"
-        assert "-f" in args
-        assert "concat" in args
+        assert "-filter_complex" in args
+        assert "concat=n=2" in args[args.index("-filter_complex") + 1]
 
 
 def test_process_single_video_returns_output_path():
