@@ -3,10 +3,7 @@
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[
-        ('/opt/homebrew/bin/ffmpeg', '.'),
-        ('/opt/homebrew/bin/ffprobe', '.'),
-    ],
+    binaries=[],
     datas=[],
     hiddenimports=[],
     hookspath=[],

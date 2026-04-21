@@ -1,18 +1,11 @@
-import sys
 import subprocess
 from pathlib import Path
 
 
-def _bin(name: str) -> str:
-    if getattr(sys, "frozen", False):
-        return str(Path(sys._MEIPASS) / name)
-    return name
-
-
 def check_ffmpeg() -> bool:
     try:
-        subprocess.run([_bin("ffmpeg"), "-version"], capture_output=True, check=True)
-        subprocess.run([_bin("ffprobe"), "-version"], capture_output=True, check=True)
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+        subprocess.run(["ffprobe", "-version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -21,7 +14,7 @@ def check_ffmpeg() -> bool:
 def get_video_info(path: str) -> dict:
     result = subprocess.run(
         [
-            _bin("ffprobe"), "-v", "error",
+            "ffprobe", "-v", "error",
             "-show_entries", "format=duration",
             "-of", "csv=p=0",
             path,
@@ -44,7 +37,7 @@ def trim_and_concat(
     )
     subprocess.run(
         [
-            _bin("ffmpeg"), "-y",
+            "ffmpeg", "-y",
             "-i", input_path,
             "-i", ad_path,
             "-filter_complex", filter_complex,
