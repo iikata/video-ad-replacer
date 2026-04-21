@@ -1,6 +1,5 @@
 import sys
 import subprocess
-import tempfile
 from pathlib import Path
 
 
@@ -35,31 +34,23 @@ def get_video_info(path: str) -> dict:
     return {"duration": duration}
 
 
-def trim_video(input_path: str, output_path: str, keep_duration: float) -> None:
+def trim_and_concat(
+    input_path: str, ad_path: str, output_path: str, keep_duration: float
+) -> None:
+    filter_complex = (
+        f"[0:v]trim=duration={keep_duration},setpts=PTS-STARTPTS[v0];"
+        f"[0:a]atrim=duration={keep_duration},asetpts=PTS-STARTPTS[a0];"
+        f"[v0][a0][1:v][1:a]concat=n=2:v=1:a=1[v][a]"
+    )
     subprocess.run(
         [
             _bin("ffmpeg"), "-y",
             "-i", input_path,
-            "-t", str(keep_duration),
-            "-c:v", "libx264", "-preset", "ultrafast",
-            "-c:a", "aac",
-            output_path,
-        ],
-        capture_output=True,
-        check=True,
-    )
-
-
-def concat_videos(video1_path: str, video2_path: str, output_path: str) -> None:
-    subprocess.run(
-        [
-            _bin("ffmpeg"), "-y",
-            "-i", video1_path,
-            "-i", video2_path,
-            "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]",
+            "-i", ad_path,
+            "-filter_complex", filter_complex,
             "-map", "[v]",
             "-map", "[a]",
-            "-c:v", "libx264", "-preset", "ultrafast",
+            "-c:v", "libx264", "-crf", "18", "-preset", "ultrafast",
             "-c:a", "aac",
             output_path,
         ],
@@ -87,10 +78,7 @@ def process_single_video(
             f"カット秒数({cut_seconds}秒)が動画の長さ({info['duration']:.1f}秒)以上です"
         )
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        trimmed_path = str(Path(tmpdir) / "trimmed.mp4")
-        trim_video(target_path, trimmed_path, keep_duration)
-        concat_videos(trimmed_path, ad_path, output_path)
+    trim_and_concat(target_path, ad_path, output_path, keep_duration)
 
     if progress_callback:
         progress_callback(target.name, output_filename)
