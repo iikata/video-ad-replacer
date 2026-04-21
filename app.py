@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, scrolledtext
 import threading
 from pathlib import Path
-from processor import check_ffmpeg, process_single_video
+from processor import check_ffmpeg, get_video_info, process_single_video
 
 
 class App(tk.Tk):
@@ -19,6 +19,7 @@ class App(tk.Tk):
         # --- フォルダ / ファイル選択エリア ---
         fields = [
             ("target_dir",  "Targetフォルダ",  "dir"),
+            ("old_ad_file", "前の広告MP4",      "old_ad"),
             ("ad_file",     "新規広告MP4",       "file"),
             ("output_dir",  "出力先フォルダ",    "dir"),
         ]
@@ -38,13 +39,11 @@ class App(tk.Tk):
         # --- フレーム数入力 ---
         frame_f = tk.Frame(self)
         frame_f.pack(fill="x", **pad)
-        tk.Label(
-            frame_f,
-            text="前の広告のフレーム数（例: 1800）",
-            anchor="w",
-        ).pack(side="left")
-        self._cut_frames_var = tk.StringVar(value="1800")
+        tk.Label(frame_f, text="カットフレーム数", anchor="w").pack(side="left")
+        self._cut_frames_var = tk.StringVar(value="")
         tk.Entry(frame_f, textvariable=self._cut_frames_var, width=8).pack(side="left", padx=8)
+        self._frames_hint = tk.Label(frame_f, text="← 前の広告MP4を選択すると自動入力", fg="gray")
+        self._frames_hint.pack(side="left")
 
         # --- 実行ボタン ---
         self._run_btn = tk.Button(self, text="実行", width=20, command=self._run)
@@ -60,10 +59,24 @@ class App(tk.Tk):
     def _browse(self, kind: str, var: tk.StringVar):
         if kind == "dir":
             path = filedialog.askdirectory()
+        elif kind == "old_ad":
+            path = filedialog.askopenfilename(filetypes=[("MP4ファイル", "*.mp4")])
+            if path:
+                var.set(path)
+                self._load_old_ad_frames(path)
+            return
         else:
             path = filedialog.askopenfilename(filetypes=[("MP4ファイル", "*.mp4")])
         if path:
             var.set(path)
+
+    def _load_old_ad_frames(self, path: str):
+        try:
+            info = get_video_info(path)
+            self._cut_frames_var.set(str(info["frame_count"]))
+            self._frames_hint.config(text=f"← {info['frame_count']}フレーム ({info['fps']:.2f}fps)", fg="green")
+        except Exception as e:
+            self._frames_hint.config(text=f"← 読み取りエラー: {e}", fg="red")
 
     def _log_write(self, message: str, tag: str = ""):
         self._log.config(state="normal")
@@ -81,12 +94,15 @@ class App(tk.Tk):
 
     def _validate_inputs(self) -> tuple[bool, str]:
         target = self._vars["target_dir"].get()
+        old_ad = self._vars["old_ad_file"].get()
         ad = self._vars["ad_file"].get()
         output = self._vars["output_dir"].get()
         cut = self._cut_frames_var.get()
 
         if not target or not Path(target).is_dir():
             return False, "Targetフォルダを選択してください"
+        if not old_ad or not Path(old_ad).is_file():
+            return False, "前の広告MP4を選択してください"
         if not ad or not Path(ad).is_file():
             return False, "新規広告MP4を選択してください"
         if not output or not Path(output).is_dir():
