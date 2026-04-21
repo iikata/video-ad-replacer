@@ -55,3 +55,35 @@ def test_concat_videos_creates_list_file_and_calls_ffmpeg():
         assert args[0] == "ffmpeg"
         assert "-f" in args
         assert "concat" in args
+
+
+from processor import process_single_video
+
+
+def test_process_single_video_returns_output_path():
+    with patch("processor.get_video_info") as mock_info, \
+         patch("processor.trim_video") as mock_trim, \
+         patch("processor.concat_videos") as mock_concat, \
+         patch("processor.tempfile.TemporaryDirectory") as mock_tmp:
+        mock_info.return_value = {"frame_count": 900, "fps": 30.0}
+        mock_tmp.return_value.__enter__ = lambda s: "/tmp/fake"
+        mock_tmp.return_value.__exit__ = MagicMock(return_value=False)
+        result = process_single_video(
+            target_path="/videos/lecture_001.mp4",
+            ad_path="/ads/new_ad.mp4",
+            output_dir="/output",
+            cut_frames=300,
+        )
+        assert result == "/output/ad_updated_lecture_001.mp4"
+
+
+def test_process_single_video_raises_when_cut_exceeds_total():
+    with patch("processor.get_video_info") as mock_info:
+        mock_info.return_value = {"frame_count": 100, "fps": 30.0}
+        with pytest.raises(ValueError, match="カットフレーム数"):
+            process_single_video(
+                target_path="input.mp4",
+                ad_path="ad.mp4",
+                output_dir="/output",
+                cut_frames=200,
+            )

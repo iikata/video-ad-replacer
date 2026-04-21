@@ -69,3 +69,33 @@ def concat_videos(video1_path: str, video2_path: str, output_path: str) -> None:
         )
     finally:
         os.unlink(list_path)
+
+
+def process_single_video(
+    target_path: str,
+    ad_path: str,
+    output_dir: str,
+    cut_frames: int,
+    progress_callback=None,
+) -> str:
+    target = Path(target_path)
+    output_filename = f"ad_updated_{target.name}"
+    output_path = str(Path(output_dir) / output_filename)
+
+    info = get_video_info(target_path)
+    keep_frames = info["frame_count"] - cut_frames
+
+    if keep_frames <= 0:
+        raise ValueError(
+            f"カットフレーム数({cut_frames})が総フレーム数({info['frame_count']})以上です"
+        )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        trimmed_path = str(Path(tmpdir) / "trimmed.mp4")
+        trim_video(target_path, trimmed_path, keep_frames, info["fps"])
+        concat_videos(trimmed_path, ad_path, output_path)
+
+    if progress_callback:
+        progress_callback(target.name, output_filename)
+
+    return output_path
